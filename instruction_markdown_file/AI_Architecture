@@ -1,0 +1,555 @@
+# 10_AI_ARCHITECTURE.md
+
+# astrologer.ai
+## AI Architecture
+
+Version 1.0
+
+---
+
+# Objective
+
+The AI system should generate a premium, personalized palm reading report from a single uploaded palm image.
+
+The report should feel:
+
+• Personal
+
+• Insightful
+
+• Consistent
+
+• High quality
+
+• Generated within 15–20 seconds
+
+The AI should never generate harmful, medical, legal or guaranteed future predictions.
+
+---
+
+# AI Pipeline Overview
+
+User Uploads Palm
+
+↓
+
+Validate Image
+
+↓
+
+Upload to Cloudinary
+
+↓
+
+Store Image URL
+
+↓
+
+OpenAI Vision Analysis
+
+↓
+
+Structured Palm Analysis (JSON)
+
+↓
+
+OpenAI Report Generation
+
+↓
+
+Generate Full Report
+
+↓
+
+Generate Preview
+
+↓
+
+Store Report in MongoDB
+
+↓
+
+Return Preview
+
+↓
+
+Payment
+
+↓
+
+Unlock Existing Report
+
+---
+
+# Why Two-Step AI?
+
+Do NOT ask the LLM to directly inspect the image and write a report.
+
+Instead:
+
+Step 1
+
+Vision Model extracts structured observations.
+
+Step 2
+
+LLM converts observations into a premium report.
+
+Advantages
+
+• More consistent output
+
+• Easier debugging
+
+• Lower hallucinations
+
+• Better prompt control
+
+• Easy to swap LLM providers later
+
+---
+
+# AI Components
+
+## Component 1
+
+Vision Analysis Service
+
+Responsibility
+
+Read palm image.
+
+Extract observable palm features.
+
+Output structured JSON only.
+
+No predictions.
+
+No report writing.
+
+---
+
+## Component 2
+
+Report Generation Service
+
+Responsibility
+
+Take structured palm observations.
+
+Generate the final personalized report.
+
+---
+
+# AI Models
+
+## Vision
+
+Recommended
+
+OpenAI GPT-4.1 Vision (or latest multimodal model)
+
+Purpose
+
+Analyze uploaded palm image.
+
+Extract observable palm characteristics.
+
+---
+
+## LLM
+
+Recommended
+
+OpenAI GPT-4.1
+
+Purpose
+
+Generate a premium report from structured JSON.
+
+Future
+
+The implementation should allow replacing OpenAI with:
+
+• Gemini
+
+• Claude
+
+• DeepSeek
+
+without changing business logic.
+
+---
+
+# Vision Output Schema
+
+The Vision model should ONLY return JSON.
+
+Example
+
+```json
+{
+  "hand": "right",
+  "confidence": 0.94,
+  "imageQuality": "good",
+
+  "majorLines": {
+    "lifeLine": {
+      "length": "long",
+      "depth": "deep",
+      "curve": "moderate"
+    },
+    "headLine": {
+      "length": "medium",
+      "depth": "clear",
+      "curve": "straight"
+    },
+    "heartLine": {
+      "length": "long",
+      "depth": "clear",
+      "curve": "curved"
+    },
+    "fateLine": {
+      "visibility": "moderate"
+    }
+  },
+
+  "mounts": {
+    "venus": "prominent",
+    "jupiter": "average",
+    "saturn": "strong",
+    "apollo": "moderate",
+    "mercury": "average"
+  },
+
+  "overallObservation": "Clear palm with strong major lines."
+}
+```
+
+Never generate interpretations.
+
+Only observations.
+
+---
+
+# Report Generation Input
+
+The LLM receives
+
+• Structured JSON
+
+• Prompt
+
+• Writing guidelines
+
+• Output format
+
+The LLM never receives the raw image.
+
+---
+
+# AI Flow
+
+1.
+
+Validate upload.
+
+↓
+
+2.
+
+Upload to Cloudinary.
+
+↓
+
+3.
+
+Call Vision model.
+
+↓
+
+4.
+
+Receive structured JSON.
+
+↓
+
+5.
+
+Store JSON.
+
+↓
+
+6.
+
+Call Report Generator.
+
+↓
+
+7.
+
+Generate complete report.
+
+↓
+
+8.
+
+Generate preview.
+
+↓
+
+9.
+
+Store report.
+
+↓
+
+10.
+
+Return preview.
+
+---
+
+# Report Generation Strategy
+
+Generate the FULL report immediately after upload.
+
+Do NOT generate anything after payment.
+
+Advantages
+
+• Instant unlock
+
+• No second AI call
+
+• Easier retries
+
+• Lower latency
+
+• Better UX
+
+---
+
+# Preview Strategy
+
+Preview should contain approximately 20% of the report.
+
+Blur remaining content.
+
+CTA
+
+Unlock Your Complete Reading
+
+The preview must create curiosity.
+
+---
+
+# Image Validation
+
+Reject if
+
+• Multiple hands detected
+
+• Palm not visible
+
+• Poor lighting
+
+• Blurry image
+
+• Low resolution
+
+• Fingers cropped
+
+Return user-friendly error messages.
+
+---
+
+# Retry Strategy
+
+If Vision fails
+
+Retry once.
+
+If Report generation fails
+
+Retry once.
+
+If still unsuccessful
+
+Return
+
+"We couldn't analyze your palm. Please try another image."
+
+Never loop indefinitely.
+
+---
+
+# Timeout Rules
+
+Vision
+
+20 seconds
+
+Report Generation
+
+20 seconds
+
+Overall request
+
+40 seconds
+
+After timeout
+
+Return graceful error.
+
+---
+
+# AI Safety
+
+The AI must never
+
+• Diagnose diseases
+
+• Predict death
+
+• Predict accidents
+
+• Guarantee marriage
+
+• Guarantee wealth
+
+• Give legal advice
+
+• Give financial advice
+
+Reports should be framed as reflective insights, not factual predictions.
+
+---
+
+# Confidence Handling
+
+If image quality is low
+
+Ask user to upload another image.
+
+Never fabricate confidence.
+
+---
+
+# Cost Optimization
+
+One Vision request
+
+One LLM request
+
+Only one report generated per upload.
+
+No repeated AI calls after payment.
+
+---
+
+# Database Storage
+
+Store
+
+Image URL
+
+Vision JSON
+
+Preview
+
+Full Report
+
+Confidence
+
+AI Version
+
+Prompt Version
+
+Created Timestamp
+
+This allows future regeneration if prompts improve.
+
+---
+
+# Prompt Versioning
+
+Every report should record
+
+Vision Prompt Version
+
+Report Prompt Version
+
+Example
+
+Vision Prompt v1.0
+
+Report Prompt v1.0
+
+This enables future upgrades without breaking consistency.
+
+---
+
+# Logging
+
+Log
+
+AI request duration
+
+Vision duration
+
+LLM duration
+
+Failures
+
+Retry attempts
+
+Do NOT log
+
+API Keys
+
+User personal information
+
+Full report text
+
+---
+
+# Future Enhancements
+
+• Multi-language reports
+
+• Voice report narration
+
+• Compatibility reports
+
+• Daily AI horoscope
+
+• AI chat with report
+
+• Personalized recommendations
+
+Not required for MVP.
+
+---
+
+# Acceptance Criteria
+
+✓ Palm image successfully analyzed.
+
+✓ Vision returns structured JSON only.
+
+✓ LLM generates report from JSON.
+
+✓ Full report generated before payment.
+
+✓ Preview automatically created.
+
+✓ AI failures handled gracefully.
+
+✓ Retry logic implemented.
+
+✓ Reports stored in MongoDB.
+
+✓ Prompt versions stored.
+
+✓ AI architecture supports future model replacement.
