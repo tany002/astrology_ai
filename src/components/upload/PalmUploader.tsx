@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Upload, ImagePlus, AlertCircle, CheckCircle2, X } from "lucide-react";
 import { COPY } from "@/constants/copy";
-import { MOCK_REPORT_ID } from "@/lib/mockData";
+import { uploadPalmImage, ApiError } from "@/lib/api";
 import Button from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 
@@ -28,6 +28,7 @@ export default function PalmUploader() {
   const router = useRouter();
   const [uploadState, setUploadState] = useState<UploadState>("idle");
   const [preview, setPreview] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [error, setError] = useState<ValidationError | null>(null);
 
   const onDrop = useCallback((accepted: File[], rejected: FileRejection[]) => {
@@ -50,6 +51,7 @@ export default function PalmUploader() {
       const file = accepted[0];
       const url = URL.createObjectURL(file);
       setPreview(url);
+      setSelectedFile(file);
       setUploadState("selected");
     }
   }, []);
@@ -62,17 +64,30 @@ export default function PalmUploader() {
     multiple: false,
   });
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
+    if (!selectedFile) return;
+
     setUploadState("uploading");
-    // Phase 1: simulate upload delay then navigate to scan
-    setTimeout(() => {
-      router.push(`/scan/${MOCK_REPORT_ID}`);
-    }, 800);
+    setError(null);
+
+    try {
+      const { imageUrl } = await uploadPalmImage(selectedFile);
+      sessionStorage.setItem("pendingImageUrl", imageUrl);
+      router.push("/scan/pending");
+    } catch (err) {
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : "Upload failed. Please check your connection and try again.";
+      setError({ message });
+      setUploadState("selected");
+    }
   };
 
   const handleClear = (e: React.MouseEvent) => {
     e.stopPropagation();
     setPreview(null);
+    setSelectedFile(null);
     setUploadState("idle");
     setError(null);
   };
@@ -98,7 +113,6 @@ export default function PalmUploader() {
 
         <AnimatePresence mode="wait">
           {preview ? (
-            /* Selected state — show image preview */
             <motion.div
               key="preview"
               initial={{ opacity: 0 }}
@@ -122,13 +136,10 @@ export default function PalmUploader() {
               </button>
               <div className="absolute bottom-3 left-3 flex items-center gap-2 bg-black/60 rounded-full px-3 py-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5 text-[#35D07F]" />
-                <span className="text-white text-xs font-medium">
-                  Image selected
-                </span>
+                <span className="text-white text-xs font-medium">Image selected</span>
               </div>
             </motion.div>
           ) : (
-            /* Idle / drag state */
             <motion.div
               key="idle"
               initial={{ opacity: 0 }}
@@ -154,17 +165,11 @@ export default function PalmUploader() {
               </motion.div>
 
               {isDragActive ? (
-                <p className="text-[#D4AF37] font-medium">
-                  Drop your image here
-                </p>
+                <p className="text-[#D4AF37] font-medium">Drop your image here</p>
               ) : (
                 <>
-                  <p className="text-white font-medium text-base">
-                    {COPY.upload.dragText}
-                  </p>
-                  <p className="text-[#A5A8C3] text-sm">
-                    {COPY.upload.orText}
-                  </p>
+                  <p className="text-white font-medium text-base">{COPY.upload.dragText}</p>
+                  <p className="text-[#A5A8C3] text-sm">{COPY.upload.orText}</p>
                   <span className="px-4 py-2 rounded-xl border border-[#2D355A] text-[#A5A8C3] text-sm hover:border-[#D4AF37]/40 hover:text-white transition-colors duration-150">
                     Browse file
                   </span>
@@ -176,7 +181,7 @@ export default function PalmUploader() {
         </AnimatePresence>
       </div>
 
-      {/* Validation error */}
+      {/* Validation / API error */}
       <AnimatePresence>
         {error && (
           <motion.div
@@ -186,14 +191,12 @@ export default function PalmUploader() {
             className="flex items-start gap-3 p-4 rounded-2xl bg-[#FF6B6B]/10 border border-[#FF6B6B]/20"
           >
             <AlertCircle className="w-4 h-4 text-[#FF6B6B] flex-shrink-0 mt-0.5" />
-            <p className="text-[#FF6B6B] text-sm leading-relaxed">
-              {error.message}
-            </p>
+            <p className="text-[#FF6B6B] text-sm leading-relaxed">{error.message}</p>
           </motion.div>
         )}
       </AnimatePresence>
 
-        <AnimatePresence>
+      <AnimatePresence>
         {(uploadState === "selected" || uploadState === "uploading") && (
           <motion.div
             initial={{ opacity: 0, y: 8 }}
@@ -204,8 +207,9 @@ export default function PalmUploader() {
               fullWidth
               onClick={handleContinue}
               loading={uploadState === "uploading"}
+              disabled={uploadState === "uploading"}
             >
-              Analyze My Palm
+              {uploadState === "uploading" ? "Uploading..." : "Analyze My Palm"}
             </Button>
           </motion.div>
         )}

@@ -3,33 +3,58 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, AlertCircle } from "lucide-react";
 import { COPY } from "@/constants/copy";
-import { MOCK_REPORT_ID } from "@/lib/mockData";
+import { analyzePalm, ApiError } from "@/lib/api";
+import Button from "@/components/ui/Button";
 
 const STEP_DURATIONS = [700, 1000, 900, 1000, 900, 800, 800]; // ms per step
-const MINIMUM_DISPLAY_MS = 5000; // always show at least 5s
+const MINIMUM_DISPLAY_MS = 5000;
 
 export default function ScanAnimation() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
-  const [scanPosition, setScanPosition] = useState(0); // 0–100 %
+  const [scanPosition, setScanPosition] = useState(0);
   const [done, setDone] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
   const startTime = useRef(Date.now());
+  const analysisPromise = useRef<Promise<{ reportId: string }> | null>(null);
 
-  // Advance steps on a timer
   useEffect(() => {
-    let stepIndex = 0;
+    const imageUrl = sessionStorage.getItem("pendingImageUrl");
 
+    if (!imageUrl) {
+      router.replace("/upload");
+      return;
+    }
+
+    // Start analysis immediately
+    analysisPromise.current = (async () => {
+      const result = await analyzePalm(imageUrl);
+      sessionStorage.removeItem("pendingImageUrl");
+      return { reportId: result.reportId };
+    })();
+
+    // Advance animation steps
+    let stepIndex = 0;
     const advance = () => {
       if (stepIndex >= COPY.scan.steps.length - 1) {
-        // All steps done — enforce minimum display time then navigate
         const elapsed = Date.now() - startTime.current;
         const remaining = Math.max(0, MINIMUM_DISPLAY_MS - elapsed);
-        setTimeout(() => {
-          setDone(true);
-          setTimeout(() => router.push(`/preview/${MOCK_REPORT_ID}`), 600);
+
+        setTimeout(async () => {
+          try {
+            const { reportId } = await analysisPromise.current!;
+            setDone(true);
+            setTimeout(() => router.push(`/preview/${reportId}`), 600);
+          } catch (err) {
+            const message =
+              err instanceof ApiError
+                ? err.message
+                : "Analysis failed. Please try again with a clearer photo.";
+            setAnalysisError(message);
+          }
         }, remaining);
         return;
       }
@@ -46,7 +71,7 @@ export default function ScanAnimation() {
     advance();
   }, [router]);
 
-  // Scan beam animation — moves 0→100 over 5 seconds
+  // Scan beam animation — moves 0→100 over MINIMUM_DISPLAY_MS
   useEffect(() => {
     const total = MINIMUM_DISPLAY_MS;
     const interval = 30;
@@ -59,20 +84,31 @@ export default function ScanAnimation() {
     return () => clearInterval(timer);
   }, []);
 
+  if (analysisError) {
+    return (
+      <div className="w-full max-w-[420px] mx-auto flex flex-col items-center gap-8 text-center">
+        <div className="w-16 h-16 rounded-full bg-[#FF6B6B]/10 border border-[#FF6B6B]/20 flex items-center justify-center">
+          <AlertCircle className="w-8 h-8 text-[#FF6B6B]" />
+        </div>
+        <div>
+          <h2 className="text-white text-xl font-bold mb-2">Analysis Failed</h2>
+          <p className="text-[#A5A8C3] text-base leading-relaxed">{analysisError}</p>
+        </div>
+        <Button onClick={() => router.push("/upload")}>Try Again</Button>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full max-w-[420px] mx-auto flex flex-col items-center gap-10">
       {/* Palm with scan beam */}
       <div className="relative w-[240px] h-[290px]">
-        {/* Glow */}
         <div
           className="absolute inset-0 pointer-events-none rounded-full"
           style={{
-            background:
-              "radial-gradient(circle, rgba(212,175,55,0.15) 0%, transparent 70%)",
+            background: "radial-gradient(circle, rgba(212,175,55,0.15) 0%, transparent 70%)",
           }}
         />
-
-        {/* Palm illustration — inline SVG for scan consistency */}
         <motion.div
           className="absolute inset-0 flex items-center justify-center"
           initial={{ opacity: 0, scale: 0.9 }}
@@ -81,8 +117,6 @@ export default function ScanAnimation() {
         >
           <ScanPalm />
         </motion.div>
-
-        {/* Scanning beam */}
         <motion.div
           className="absolute left-0 right-0 h-[2px] pointer-events-none"
           style={{
@@ -111,7 +145,6 @@ export default function ScanAnimation() {
                   transition={{ duration: 0.3 }}
                   className="flex items-center gap-3"
                 >
-                  {/* Icon */}
                   <div className="flex-shrink-0 w-5 h-5 flex items-center justify-center">
                     {isCompleted ? (
                       <CheckCircle2 className="w-5 h-5 text-[#35D07F]" />
@@ -125,8 +158,6 @@ export default function ScanAnimation() {
                       <div className="w-2 h-2 rounded-full bg-[#2D355A]" />
                     )}
                   </div>
-
-                  {/* Label */}
                   <span
                     className={
                       isCompleted
@@ -145,9 +176,9 @@ export default function ScanAnimation() {
         })}
       </div>
 
-      {/* Holding state */}
+      {/* Holding state while waiting for AI */}
       <AnimatePresence>
-        {currentStep >= COPY.scan.steps.length - 1 && !done && (
+        {currentStep >= COPY.scan.steps.length - 1 && !done && !analysisError && (
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: [0, 1, 0.6, 1] }}
@@ -162,9 +193,9 @@ export default function ScanAnimation() {
   );
 }
 
-// ─── Simple palm SVG for scan background ─────────────────────────────────────
 function ScanPalm() {
-  const OUTLINE = "M 76 385 C 54 382 44 365 44 344 L 46 268 C 46 254 49 242 54 230 C 54 212 57 196 60 181 C 60 164 65 151 76 147 C 87 143 101 145 107 155 C 113 165 113 180 111 196 L 108 222 C 111 212 117 206 124 207 L 125 169 C 125 151 132 138 145 135 C 158 132 171 137 176 148 C 181 159 180 177 177 193 L 173 223 C 176 213 182 207 190 208 L 191 162 C 191 144 199 130 213 128 C 227 126 239 133 243 147 C 247 161 244 179 240 195 L 234 225 C 238 215 246 209 254 212 L 256 175 C 257 157 265 143 277 140 C 289 137 299 146 301 160 C 303 174 299 193 291 207 L 277 237 C 268 255 254 267 240 277 C 250 287 272 287 276 277 L 283 255 C 290 237 294 219 289 205 C 284 191 273 185 262 189 C 251 193 245 207 243 223 L 238 251 C 235 271 233 293 234 315 C 235 343 232 367 228 381 C 226 397 198 405 146 403 C 106 403 86 397 76 385 Z";
+  const OUTLINE =
+    "M 76 385 C 54 382 44 365 44 344 L 46 268 C 46 254 49 242 54 230 C 54 212 57 196 60 181 C 60 164 65 151 76 147 C 87 143 101 145 107 155 C 113 165 113 180 111 196 L 108 222 C 111 212 117 206 124 207 L 125 169 C 125 151 132 138 145 135 C 158 132 171 137 176 148 C 181 159 180 177 177 193 L 173 223 C 176 213 182 207 190 208 L 191 162 C 191 144 199 130 213 128 C 227 126 239 133 243 147 C 247 161 244 179 240 195 L 234 225 C 238 215 246 209 254 212 L 256 175 C 257 157 265 143 277 140 C 289 137 299 146 301 160 C 303 174 299 193 291 207 L 277 237 C 268 255 254 267 240 277 C 250 287 272 287 276 277 L 283 255 C 290 237 294 219 289 205 C 284 191 273 185 262 189 C 251 193 245 207 243 223 L 238 251 C 235 271 233 293 234 315 C 235 343 232 367 228 381 C 226 397 198 405 146 403 C 106 403 86 397 76 385 Z";
 
   const lines = [
     { d: "M 74 232 C 100 222 135 218 165 216 C 195 214 222 220 244 229", color: "#F87171" },
@@ -191,8 +222,8 @@ function ScanPalm() {
           </feMerge>
         </filter>
         <radialGradient id="scan-aura" cx="50%" cy="52%" r="48%">
-          <stop offset="0%"   stopColor="#6E5BFF" stopOpacity="0.18" />
-          <stop offset="100%" stopColor="#090B16" stopOpacity="0"   />
+          <stop offset="0%" stopColor="#6E5BFF" stopOpacity="0.18" />
+          <stop offset="100%" stopColor="#090B16" stopOpacity="0" />
         </radialGradient>
       </defs>
       <ellipse cx={150} cy={228} rx={148} ry={190} fill="url(#scan-aura)" />
