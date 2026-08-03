@@ -1,14 +1,12 @@
 import 'dotenv/config';
 import app from './app.js';
 import { connectDatabase } from './config/database.js';
-import { initCloudinary } from './config/cloudinary.js';
 import { logger } from './utils/logger.js';
 
 const PORT = parseInt(process.env.PORT ?? '5000', 10);
 
 async function start(): Promise<void> {
   try {
-    initCloudinary();
     await connectDatabase();
 
     app.listen(PORT, () => {

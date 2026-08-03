@@ -4,7 +4,8 @@ export function initCloudinary(): void {
   const { CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET } = process.env;
 
   if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_API_KEY || !CLOUDINARY_API_SECRET) {
-    throw new Error('Cloudinary environment variables are required');
+    console.warn('[Cloudinary] env vars not set — upload features will be unavailable');
+    return;
   }
 
   cloudinary.config({
