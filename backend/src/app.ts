@@ -6,11 +6,21 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 
 const app = express();
 
-const allowedOrigins = [
-  process.env.FRONTEND_URL ?? 'http://localhost:3000',
-  'http://localhost:3000',
-  'http://localhost:3001',
-];
+const allowedOrigins: string[] = [];
+
+if (process.env.FRONTEND_URL) {
+  allowedOrigins.push(process.env.FRONTEND_URL);
+} else {
+  console.warn(
+    '[CORS] WARNING: FRONTEND_URL is not set. ' +
+    'Only localhost origins are allowed. All production browser requests will be rejected.'
+  );
+}
+
+// Allow localhost only outside production (local dev and test environments)
+if (process.env.NODE_ENV !== 'production') {
+  allowedOrigins.push('http://localhost:3000', 'http://localhost:3001');
+}
 
 app.use(
   helmet({

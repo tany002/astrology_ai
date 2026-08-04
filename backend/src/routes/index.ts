@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import mongoose from 'mongoose';
 import {
   createSimpleOrderController,
   verifySimplePaymentController,
@@ -7,9 +8,14 @@ import {
 const router = Router();
 
 router.get('/health', (_req, res) => {
-  res.json({
-    status: 'healthy',
-    database: 'connected',
+  const dbState = mongoose.connection.readyState;
+  // 0 = disconnected, 1 = connected, 2 = connecting, 3 = disconnecting
+  const dbStatus = dbState === 1 ? 'connected' : dbState === 2 ? 'connecting' : 'disconnected';
+  const isHealthy = dbState === 1;
+
+  res.status(isHealthy ? 200 : 503).json({
+    status: isHealthy ? 'healthy' : 'unhealthy',
+    database: dbStatus,
     payments: 'online',
     timestamp: new Date().toISOString(),
   });

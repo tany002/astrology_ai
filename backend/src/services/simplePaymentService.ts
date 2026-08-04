@@ -77,10 +77,22 @@ export async function verifySimplePayment(
     });
   }
 
-  await Payment.updateOne(
+  const updated = await Payment.findOneAndUpdate(
     { razorpayOrderId },
-    { $set: { razorpayPaymentId, status: 'paid' } }
+    { $set: { razorpayPaymentId, status: 'paid' } },
+    { new: true }
   );
+
+  if (!updated) {
+    // Payment was cryptographically verified but no DB record matched.
+    // This happens if Payment.create() failed during order creation.
+    // Log for manual reconciliation — do NOT reject the response,
+    // as the money has already been captured by Razorpay.
+    logger.warn(
+      'SimplePayment',
+      `Verified payment ${razorpayPaymentId} but no Payment record found for order ${razorpayOrderId} — requires manual reconciliation`
+    );
+  }
 
   logger.info('SimplePayment', `Payment verified: ${razorpayPaymentId}`);
 
