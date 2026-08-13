@@ -13,12 +13,15 @@ async function start(): Promise<void> {
   try {
     await connectDatabase();
 
-    const server = app.listen(PORT, HOST, () => {
-      logger.info(
-        'Server',
-        `Listening on ${HOST}:${PORT} (${process.env.NODE_ENV ?? 'development'})`
-      );
-    });
+    const server = app.listen(
+      { port: PORT, host: HOST, ipv6Only: false },
+      () => {
+        logger.info(
+          'Server',
+          `Listening on ${HOST}:${PORT} (${process.env.NODE_ENV ?? 'development'})`
+        );
+      }
+    );
 
     server.on('error', (error) => {
       logger.error('Server', 'HTTP server error', error);

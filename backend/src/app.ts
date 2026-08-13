@@ -18,7 +18,10 @@ if (process.env.FRONTEND_URL) {
   // Browser Origin never has a trailing slash.
   // FRONTEND_URL=https://astrology-ai-iota.vercel.app/ must match
   // Origin https://astrology-ai-iota.vercel.app
-  allowedOrigins.push(normalizeOrigin(process.env.FRONTEND_URL));
+  for (const raw of process.env.FRONTEND_URL.split(',')) {
+    const origin = normalizeOrigin(raw);
+    if (origin) allowedOrigins.push(origin);
+  }
 } else {
   console.warn(
     '[CORS] WARNING: FRONTEND_URL is not set. ' +

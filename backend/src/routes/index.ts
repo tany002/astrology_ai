@@ -13,7 +13,9 @@ router.get('/health', (_req, res) => {
   const dbStatus = dbState === 1 ? 'connected' : dbState === 2 ? 'connecting' : 'disconnected';
   const isHealthy = dbState === 1;
 
-  res.status(isHealthy ? 200 : 503).json({
+  // Always 200 so Northflank liveness probes do not mark the service unhealthy
+  // and return 503 to the browser. Database state is reported in the body.
+  res.status(200).json({
     status: isHealthy ? 'healthy' : 'unhealthy',
     database: dbStatus,
     payments: 'online',
