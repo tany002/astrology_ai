@@ -1,6 +1,9 @@
 import type { ReportPreview, FullReport } from "@/types/report";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
+const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000").replace(
+  /\/+$/,
+  ""
+);
 
 class ApiError extends Error {
   constructor(
@@ -25,7 +28,17 @@ async function request<T>(
     },
   });
 
-  const json = (await res.json()) as { success: boolean; message: string; data?: T };
+  let json: { success: boolean; message: string; data?: T };
+  try {
+    json = (await res.json()) as { success: boolean; message: string; data?: T };
+  } catch {
+    throw new ApiError(
+      res.status === 503
+        ? "Payment service is temporarily unavailable. Please try again."
+        : `Request failed (${res.status}).`,
+      res.status
+    );
+  }
 
   if (!json.success) {
     throw new ApiError(json.message ?? "An error occurred.", res.status);
