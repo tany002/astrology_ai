@@ -17,9 +17,9 @@ export function errorHandler(
   });
 }
 
-export function notFoundHandler(_req: Request, res: Response): void {
+export function notFoundHandler(req: Request, res: Response): void {
   res.status(404).json({
     success: false,
-    message: 'The requested endpoint does not exist.',
+    message: `The requested endpoint does not exist: ${req.method} ${req.path}`,
   });
 }

@@ -25,6 +25,12 @@ export async function createSimpleOrderController(
 
     sendSuccess(res, orderData, 'Order created successfully', 201);
   } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    if (message.includes('Razorpay environment variables')) {
+      logger.error('SimplePaymentController', 'Razorpay is not configured', error);
+      sendError(res, 'Payment gateway is not configured.', 503);
+      return;
+    }
     logger.error('SimplePaymentController', 'Create order failed', error);
     next(error);
   }

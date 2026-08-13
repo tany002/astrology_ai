@@ -25,4 +25,22 @@ router.get('/health', (_req, res) => {
 router.post('/simple-order', createSimpleOrderController);
 router.post('/simple-verify', verifySimplePaymentController);
 
+// GET probes (wget, browser address bar) must not 404 — that looks like the
+// route is missing. These endpoints only accept POST.
+router.get('/simple-order', (_req, res) => {
+  res.set('Allow', 'POST');
+  res.status(405).json({
+    success: false,
+    message: 'Use POST /api/simple-order to create a payment order.',
+  });
+});
+
+router.get('/simple-verify', (_req, res) => {
+  res.set('Allow', 'POST');
+  res.status(405).json({
+    success: false,
+    message: 'Use POST /api/simple-verify to verify a payment.',
+  });
+});
+
 export default router;
